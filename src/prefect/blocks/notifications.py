@@ -33,13 +33,10 @@ class AbstractAppriseNotificationBlock(NotificationBlock, ABC):
     )
 
     def __init__(self, *args: Any, **kwargs: Any):
-        from apprise import (
-            NOTIFY_TYPES,  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType] incomplete type hints in apprise
-        )
-
-        if PREFECT_NOTIFY_TYPE_DEFAULT not in NOTIFY_TYPES:
-            NOTIFY_TYPES += (PREFECT_NOTIFY_TYPE_DEFAULT,)  # pyright: ignore[reportUnknownVariableType]
-
+        # Note: We no longer modify the global NOTIFY_TYPES from apprise
+        # as it may be immutable (frozenset) in newer versions.
+        # Custom notify types like PREFECT_NOTIFY_TYPE_DEFAULT work
+        # without being added to the global collection.
         super().__init__(*args, **kwargs)
 
     def _start_apprise_client(self, url: SecretStr):
