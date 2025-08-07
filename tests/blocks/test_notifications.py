@@ -942,3 +942,53 @@ class TestMicrosoftTeamsWebhook:
         pickled = cloudpickle.dumps(block)
         unpickled = cloudpickle.loads(pickled)
         assert isinstance(unpickled, MicrosoftTeamsWebhook)
+
+
+class TestAbstractAppriseNotificationBlockFrozensetFix:
+    """
+    Test the fix for TypeError: unsupported operand type(s) for +=: 'frozenset' and 'tuple'
+    that occurred when apprise.NOTIFY_TYPES became an immutable frozenset.
+    """
+
+    def test_init_with_frozenset_notify_types(self):
+        """
+        Test that AbstractAppriseNotificationBlock.__init__ works correctly
+        when apprise.NOTIFY_TYPES is a frozenset instead of a mutable collection.
+        
+        This regression test ensures that the fix for the TypeError that occurred
+        when trying to do NOTIFY_TYPES += (PREFECT_NOTIFY_TYPE_DEFAULT,) is working.
+        """
+        from prefect.blocks.notifications import AbstractAppriseNotificationBlock
+        
+        # Mock apprise.NOTIFY_TYPES as a frozenset (the problematic case)
+        with patch("apprise.NOTIFY_TYPES", frozenset(['info', 'success', 'warning', 'failure'])):
+            with patch("apprise.Apprise") as MockApprise:
+                with patch("apprise.AppriseAsset") as MockAppriseAsset:
+                    
+                    # Create a concrete test class since AbstractAppriseNotificationBlock is abstract
+                    class TestNotificationBlock(AbstractAppriseNotificationBlock):
+                        url = "https://example.com/webhook"
+                        
+                        def _start_apprise_client(self, url):
+                            pass
+                            
+                        def block_initialization(self):
+                            pass
+                    
+                    # This should not raise a TypeError about frozenset += tuple
+                    try:
+                        instance = TestNotificationBlock()
+                        # Verify the instance was created successfully
+                        assert instance is not None
+                        assert hasattr(instance, 'notify_type')
+                        # The default notify_type should be the prefect default
+                        assert instance.notify_type == PREFECT_NOTIFY_TYPE_DEFAULT
+                    except TypeError as e:
+                        if "unsupported operand type(s) for +=: 'frozenset' and 'tuple'" in str(e):
+                            pytest.fail(
+                                "The frozenset += tuple fix is not working. "
+                                f"Original error still occurs: {e}"
+                            )
+                        else:
+                            # Re-raise if it's a different TypeError
+                            raise
